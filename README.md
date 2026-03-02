@@ -8,17 +8,13 @@ A personal scheduling system that automatically optimizes daily task allocation 
 - **mcp_servers/** - MCP server tool definitions (wraps kernel functions)
 - **mcp_client/** - OpenClaw integration and Discord interface
 
-## Quick Start
 
-[To be added - installation and setup instructions]
 
-## Usage
+The Problem:
 
-Interact with the scheduler through natural language:
-- "What's my schedule today?"
-- "Add COSC assignment, due Friday, 3 hours"
-- "Mark gym as complete"
-- "Show me next week"
+You wake up with 5 courses, assignments with different deadlines, gym sessions, meals, portfolio work—all competing for limited hours (6am-midnight). Every day you're mentally juggling: "What's urgent? What can wait? Did I forget something?" It's exhausting cognitive overhead that drains energy before you even start working.
+Your Solution:
+A personal scheduling agent that thinks for you. You dump all your responsibilities into it once (or as they come up), and it continuously figures out the optimal day-by-day plan. No manual calendar Tetris. No forgetting deadlines. No decision fatigue about "what should I work on next?"
 
 ## Architecture
 
