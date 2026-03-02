@@ -4,9 +4,10 @@ A personal scheduling system that automatically optimizes daily task allocation 
 
 ## Project Structure
 
-- **kernel/** — Core scheduling logic in one file (`kernel.py`): TimeSlot, Day, Process, ProcessTable, Schedule, Dispatcher
-- **mcp_servers/** — MCP server tool definitions (wraps kernel)
+- **kernel/** — Core scheduling: `kernel.py` (implementation) and `syscalls.py` (syscall layer). External code uses `kernel.syscalls` only.
+- **mcp_servers/** — MCP server exposing tools that call the kernel API; includes composite workflow tools (e.g. create and show today).
 - **mcp_client/** — OpenClaw integration and Discord interface
+- **docs/KERNEL_AND_SYSCALL_SPEC.md** — Spec for every kernel class/attribute/method and every API syscall (including direct vs composite mapping)
 
 
 
@@ -18,9 +19,9 @@ A personal scheduling agent that thinks for you. You dump all your responsibilit
 
 ## Architecture
 
-1. **kernel/** provides core scheduling engine
-2. **mcp_servers/** exposes tools for LLM interaction
-3. **mcp_client/** handles user interface via Discord/OpenClaw
+1. **kernel/** — `kernel.py` = implementation; **kernel/syscalls.py** = syscall layer (the only code that uses kernel types). All callers use `kernel.syscalls` only.
+2. **mcp_servers/** — MCP tools call `kernel.syscalls`. Granular tools = one syscall each; composite tools (e.g. create_process_and_show_today) = multiple syscalls for common LLM requests.
+3. **mcp_client/** — User interface via Discord/OpenClaw.
 
 ## Status
 

@@ -861,9 +861,12 @@ class Dispatcher:
         days_to_search = {date: self._schedule.get_day(date)} if date else self._schedule.get_all_days()
         best_slot = None
         best_score = -1
+        min_len = process.get_minimum_session_length()
+        if min_len is None:
+            min_len = 0
         for day_date, day in days_to_search.items():
             for slot_id, slot in day.get_timeslots(status="free").items():
-                if slot.get_duration() < process.get_minimum_session_length():
+                if slot.get_duration() < min_len:
                     continue
                 score = (50 * self._weights["peak"]) if self._fits_time_window(process, slot) else 0
                 score += max(0, 20 - (datetime.strptime(day_date, "%Y-%m-%d") - datetime.now()).days)

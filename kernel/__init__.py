@@ -1,4 +1,5 @@
-# Monolithic kernel: all classes live in kernel.py
+# Kernel: implementation (kernel.py) + syscalls (syscalls.py).
+# External code should use kernel.syscalls only; kernel.kernel is internal.
 
 from .kernel import (
     TimeSlot,
@@ -9,6 +10,9 @@ from .kernel import (
     Dispatcher,
 )
 
+# Re-export syscalls as the public surface (optional: from kernel import syscalls)
+from . import syscalls
+
 __all__ = [
     "TimeSlot",
     "Day",
@@ -16,4 +20,5 @@ __all__ = [
     "ProcessTable",
     "Schedule",
     "Dispatcher",
+    "syscalls",
 ]

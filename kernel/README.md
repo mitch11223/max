@@ -1,23 +1,26 @@
 # Kernel
 
-Core scheduling logic in a single module: `kernel.py` (monolithic kernel).
+Core scheduling: **kernel.py** (implementation) and **syscalls.py** (syscall layer). External code (MCP server, CLI, scripts) should use **kernel.syscalls** only; do not import kernel classes directly.
 
-## Components (all in `kernel.py`)
+## Components
 
-- **TimeSlot** — Single time block (start, end, optional Process)
-- **Day** — One date with a grid of TimeSlots
-- **Process** — Task (PCB-like: deadline, priority, state)
-- **ProcessTable** — Container for all Process objects; JSON persistence
-- **Schedule** — Calendar of Days
-- **Dispatcher** — Assigns Processes to TimeSlots (multi-level queue, urgency)
+- **kernel.py** — TimeSlot, Day, Process, ProcessTable, Schedule, Dispatcher (internal).
+- **syscalls.py** — Syscall layer; owns the single ProcessTable, Schedule, Dispatcher; exposes functions that return JSON-serializable data. This is the only module that imports kernel.py.
 
-## Usage
+## Usage (syscalls — recommended)
 
 From project root (`max/`):
 
-```bash
-python3 -m kernel.sample_usage
+```python
+import kernel.syscalls as syscalls
+
+syscalls.create_process(name="Gym", expected_completion_time=60)
+syscalls.admit_all_processes()
+syscalls.build_schedule()
+print(syscalls.get_schedule_view("2025-03-02"))
 ```
+
+## Usage (direct kernel — for demos only)
 
 ```python
 from kernel import Process, ProcessTable, Schedule, Dispatcher
@@ -29,10 +32,10 @@ dispatcher = Dispatcher(pt, schedule)
 dispatcher.build_schedule()
 ```
 
+```bash
+python3 -m kernel.sample_usage
+```
+
 ## Data Storage
 
-ProcessTable uses JSON (`data/processes.json`) for persistence.
-
-## Independence
-
-Framework-agnostic; no dependency on MCP or OpenClaw.
+API uses `data/processes.json` (at project root) by default.
