@@ -1,4 +1,4 @@
-# Dynamic Task Scheduler
+# max (maximum time efficiency)
 
 A personal scheduling system that automatically optimizes daily task allocation based on deadlines and priorities, with natural language control via OpenClaw.
 
