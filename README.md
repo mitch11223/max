@@ -4,9 +4,9 @@ A personal scheduling system that automatically optimizes daily task allocation 
 
 ## Project Structure
 
-- **kernel/** - Core scheduling logic (Process, Schedule, Scheduler objects)
-- **mcp_servers/** - MCP server tool definitions (wraps kernel functions)
-- **mcp_client/** - OpenClaw integration and Discord interface
+- **kernel/** — Core scheduling logic in one file (`kernel.py`): TimeSlot, Day, Process, ProcessTable, Schedule, Dispatcher
+- **mcp_servers/** — MCP server tool definitions (wraps kernel)
+- **mcp_client/** — OpenClaw integration and Discord interface
 
 
 

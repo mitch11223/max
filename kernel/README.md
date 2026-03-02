@@ -1,20 +1,38 @@
 # Kernel
 
-Core scheduling logic and data structures.
+Core scheduling logic in a single module: `kernel.py` (monolithic kernel).
 
-## Components
+## Components (all in `kernel.py`)
 
-- **Process** - Task representation (PCB with deadline, priority, duration)
-- **ProcessTable** - Container for all Process objects
-- **Schedule** - Calendar structure with Days and TimeSlots
-- **Dispatcher** - Algorithm that assigns Processes to TimeSlots
-- **TimeSlot** - Individual time block within a day
-- **Day** - Collection of TimeSlots for a single date
+- **TimeSlot** — Single time block (start, end, optional Process)
+- **Day** — One date with a grid of TimeSlots
+- **Process** — Task (PCB-like: deadline, priority, state)
+- **ProcessTable** — Container for all Process objects; JSON persistence
+- **Schedule** — Calendar of Days
+- **Dispatcher** — Assigns Processes to TimeSlots (multi-level queue, urgency)
+
+## Usage
+
+From project root (`max/`):
+
+```bash
+python3 -m kernel.sample_usage
+```
+
+```python
+from kernel import Process, ProcessTable, Schedule, Dispatcher
+
+pt = ProcessTable()
+schedule = Schedule()
+schedule.initialize()
+dispatcher = Dispatcher(pt, schedule)
+dispatcher.build_schedule()
+```
 
 ## Data Storage
 
-Currently uses JSON file (`data/processes.json`) for persistence.
+ProcessTable uses JSON (`data/processes.json`) for persistence.
 
 ## Independence
 
-This module is framework-agnostic - can be used without MCP or OpenClaw.
+Framework-agnostic; no dependency on MCP or OpenClaw.
