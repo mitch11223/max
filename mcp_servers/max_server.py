@@ -3,6 +3,7 @@
 # Or: cd /path/to/max && python mcp_servers/max_server.py
 # Requires: pip install mcp
 
+import asyncio
 import json
 import sys
 from pathlib import Path
@@ -269,6 +270,82 @@ def _build_tool_schema(name, description, required, optional):
     }
 
 
+# ---------------------------------------------------------------------------
+# RootAgent singleton — lazy init on first max_chat call
+# ---------------------------------------------------------------------------
+
+_root_agent = None
+
+
+def _get_root_agent():
+    """
+    Build and cache the RootAgent with real LLM clients.
+    Reads API key from models.json — same file OpenClaw uses.
+    """
+    global _root_agent
+    if _root_agent is not None:
+        return _root_agent
+
+    models_path = _project_root / ".openclaw" / "agents" / "main" / "agent" / "models.json"
+    if not models_path.exists():
+        models_path = Path.home() / ".openclaw" / "agents" / "main" / "agent" / "models.json"
+
+    xai_key = None
+    if models_path.exists():
+        with open(models_path) as f:
+            models_data = json.load(f)
+        xai_key = models_data.get("providers", {}).get("xai", {}).get("apiKey")
+
+    from llm import XAIClient, OllamaClient
+    from agents import RootAgent
+
+    grok = XAIClient(
+        api_key=xai_key or "",
+        model="grok-4",
+    )
+    router = OllamaClient(
+        model="glm-4.7-flash",
+        max_tokens=256,
+        temperature=0.1,
+    )
+
+    _root_agent = RootAgent(
+        config=str(_project_root / "agents" / "root.yaml"),
+        syscall_api=syscalls,
+        llm=grok,
+        router_llm=router,
+    )
+    return _root_agent
+
+
+async def _handle_max_chat(args: dict) -> dict:
+    """
+    Async handler for max_chat.
+    Routes the user message through RootAgent — the single entry point
+    for all agent intelligence. Direct queries answer immediately;
+    complex goals spawn the orchestrator + agent tree.
+    """
+    message = args.get("message", "").strip()
+    if not message:
+        return {"ok": False, "error": "message is required"}
+
+    agent = _get_root_agent()
+    try:
+        response = await agent.chat(message)
+        return {"ok": True, "response": response}
+    except Exception as e:
+        return {"ok": False, "error": str(e)}
+
+
+_CHAT_TOOL_NAME = "max_chat"
+_CHAT_TOOL_DESC = (
+    "Send a natural language message to Max (the AI OS). "
+    "Max handles simple queries (schedule, status, conversation) directly "
+    "and automatically spawns research/analysis/coordination agents for complex goals. "
+    "Use this for everything — it is the main interface to the system."
+)
+
+
 def run_stdio():
     """Run MCP server over stdio (for Cursor, etc.)."""
     try:
@@ -293,19 +370,45 @@ def run_stdio():
             optional,
         ))
 
+    # Register max_chat separately — it's async and not in the TOOLS list
+    chat_tool = types.Tool(
+        name=_CHAT_TOOL_NAME,
+        description=_CHAT_TOOL_DESC,
+        input_schema={
+            "type": "object",
+            "required": ["message"],
+            "properties": {
+                "message": {"type": "string", "description": "The message to send to Max"},
+            },
+        },
+    )
+
     tool_handlers = {t[0]: TOOLS[i][4] for i, t in enumerate(TOOLS)}
 
     async def handle_list_tools(ctx, params):
-        return types.ListToolsResult(tools=[t[1] for t in tools_config])
+        all_tools = [t[1] for t in tools_config] + [chat_tool]
+        return types.ListToolsResult(tools=all_tools)
 
     async def handle_call_tool(ctx, params):
         name = params.name
+        args = params.arguments or {}
+
+        # max_chat is async — handle it first
+        if name == _CHAT_TOOL_NAME:
+            try:
+                result = await _handle_max_chat(args)
+                return types.CallToolResult(content=_tool_result_text(result))
+            except Exception as e:
+                return types.CallToolResult(
+                    content=_tool_result_text({"ok": False, "error": str(e)}),
+                    is_error=True,
+                )
+
         if name not in tool_handlers:
             return types.CallToolResult(
                 content=[{"type": "text", "text": json.dumps({"ok": False, "error": f"Unknown tool: {name}"})}],
                 is_error=True,
             )
-        args = params.arguments or {}
         try:
             result = tool_handlers[name](args)
             return types.CallToolResult(content=_tool_result_text(result))

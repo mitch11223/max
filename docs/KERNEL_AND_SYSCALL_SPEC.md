@@ -350,3 +350,112 @@ The MCP server (`mcp_servers/max_server.py`) exposes:
 | **max_create_process_and_show_today** | create_process + admit_all_processes + build_schedule + get_schedule_view(today) | **Composite** — “create and show my day” in one call. |
 
 So the mapping from MCP tool to kernel is: **MCP tool → one or more API syscalls → one or more kernel methods** as specified in the tables above.
+
+---
+
+## 6. Agents layer (agents/)
+
+The agents layer sits **above** the syscall layer. It is the autonomous execution
+tier: where natural language goals become running work.
+
+### Architecture stack
+
+```
+User goal (natural language)
+    ↓
+AgentOrchestrator          agents/orchestrator.py
+    ↓  (syscalls only)
+kernel/syscalls.py
+    ↓  (kernel objects)
+kernel/kernel.py
+```
+
+**Rule:** Agents import from `kernel.syscalls` only. They never import
+`kernel.kernel` directly. This mirrors the rule that syscalls.py is the only
+kernel consumer.
+
+---
+
+### 6.1 Process vs Agent — the key distinction
+
+| | Process | Agent |
+|---|---|---|
+| **What it is** | Kernel data record (PCB-like) | Autonomous executor |
+| **Lives in** | `ProcessTable` (kernel) | `_active_agents` (orchestrator) |
+| **Knows** | Priority, deadline, status, time | LLM client, tools, logic |
+| **Does** | Gets scheduled into TimeSlots | Actually performs the task |
+| **Lifecycle** | new → ready → running → terminated | initialized → running → completed/failed |
+
+An Agent holds a `process_id`. When it starts, the process becomes `running`.
+When it finishes, it calls `remove_process(process_id)` and the process is
+removed from the kernel. **An Agent is not a Process subclass** — they are
+separate concerns linked by ID.
+
+---
+
+### 6.2 AgentOrchestrator
+
+**File:** `agents/orchestrator.py`
+
+| Method | Description |
+|--------|-------------|
+| `process_goal(user_input, context)` | Main entry point. Decomposes goal → processes → agents. Returns plan + schedule. |
+| `handle_agent_update(agent_id, progress)` | Called by agents to report progress or completion. |
+| `_decompose_goal(user_input, context)` | LLM call → structured JSON plan with tasks. |
+| `_create_processes_from_plan(plan)` | Creates kernel Processes from plan via syscalls. Returns list of process_ids. |
+| `_spawn_agents_for_processes(process_ids)` | Instantiates correct Agent subclass for each process. |
+| `_spawn_agent(agent_type, process_id, parent_id)` | Instantiates one Agent. Internal + used by CoordinationAgent via base_agent. |
+| `_determine_agent_type(process_dict)` | Reads process tags to pick agent type. First matching tag wins. |
+| `get_active_agents()` | Returns list of active agent summaries. |
+| `get_execution_log()` | Returns full orchestrator event log. |
+
+---
+
+### 6.3 Agent base class
+
+**File:** `agents/base_agent.py`
+
+| Method | Description |
+|--------|-------------|
+| `execute()` | Override in subclass. Must call `complete()` or `fail()`. |
+| `complete(result)` | Removes process from kernel, logs completion, notifies orchestrator. |
+| `fail(reason)` | Logs failure, notifies orchestrator. Process stays for inspection. |
+| `report_progress(progress)` | Sends interim update to orchestrator. |
+| `spawn_child(agent_type, process_id)` | Delegates to orchestrator to spawn a sub-agent. Used by CoordinationAgent. |
+
+---
+
+### 6.4 Agent types
+
+| Type | Class | Tag | Use case |
+|------|-------|-----|----------|
+| Research | `ResearchAgent` | `research` | Web search, document analysis, fact-finding |
+| Transaction | `TransactionAgent` | `transaction` | Purchases, bookings, payments, orders |
+| Communication | `CommunicationAgent` | `communication` | Email, messaging, calendar scheduling |
+| Organization | `OrganizationAgent` | `organization` | File management, notes, archiving |
+| Creation | `CreationAgent` | `creation` | Code, documents, designs, any new artifact |
+| Analysis | `AnalysisAgent` | `analysis` | Data analysis, comparison, recommendations |
+| Monitoring | `MonitoringAgent` | `monitoring` | Event watching, triggers, deadline alerts |
+| Coordination | `CoordinationAgent` | `coordination` | Multi-agent workflows; spawns child agents |
+
+Agent type is determined by the **first process tag** that matches a known type.
+Tags are set by `_decompose_goal` via the LLM.
+
+---
+
+### 6.5 Typical flow
+
+```
+orchestrator.process_goal("Plan trip to Japan in May")
+    → _decompose_goal()         # LLM breaks into 5 tasks
+    → _create_processes_from_plan()  # 5 kernel Processes created
+    → admit_all_processes()     # new → ready
+    → build_schedule()          # Dispatcher assigns to TimeSlots
+    → _spawn_agents_for_processes()  # 5 Agents instantiated
+    → [caller runs agent.execute() per agent]
+        ResearchAgent.execute()     → finds visa info, flights, hotels
+        AnalysisAgent.execute()     → ranks options
+        TransactionAgent.execute()  → books flights + hotel
+        CommunicationAgent.execute()→ sends itinerary email
+        OrganizationAgent.execute() → saves trip folder with docs
+```

@@ -1,0 +1,103 @@
+# Root agent configuration — Max
+# Config + Brain + Tools in one place.
+# The RootAgent reads this on init; nothing here is executable code.
+
+identity:
+  name: Max
+  version: "1.0"
+  persona: >
+    You are Max, a personal operating system. You manage the user's time, tasks,
+    goals, and life logistics with precision and intelligence. You are direct,
+    capable, and proactive. You never waffle. When you don't know something, you
+    say so and offer to find out. You speak like a trusted chief of staff —
+    efficient, calm, and always a step ahead.
+
+# ---------------------------------------------------------------------------
+# Capabilities
+# ---------------------------------------------------------------------------
+# direct   : RootAgent handles these itself (no orchestrator needed)
+# delegate : RootAgent routes to the AgentOrchestrator for execution
+
+capabilities:
+  direct:
+    casual_conversation:
+      description: "Small talk, greetings, personal questions, general knowledge"
+      tools: []
+
+    schedule_query:
+      description: >
+        Questions about what's scheduled today or in a date range,
+        upcoming tasks, free time, next deadline
+      tools:
+        - get_schedule_view
+        - get_schedule_range
+        - get_next_deadline
+
+    status_check:
+      description: >
+        Questions about active tasks, how many processes are running,
+        what's overdue, system health, priorities
+      tools:
+        - get_stats
+        - list_processes
+        - list_overdue_processes
+
+  delegate:
+    goal_execution:
+      description: >
+        Any multi-step goal requiring research, planning, creation, booking,
+        communication, or a combination of these
+      route_to: orchestrator
+
+    task_creation:
+      description: "Create a new task, process, or recurring item in the kernel"
+      route_to: orchestrator
+
+# ---------------------------------------------------------------------------
+# Routing
+# ---------------------------------------------------------------------------
+# The router uses a cheap/fast LLM to classify user input before the
+# main LLM responds. This keeps cost low for simple messages.
+
+routing:
+  router_model: glm-4.7-flash      # fast classifier
+  response_model: grok-4            # primary responder
+  confidence_threshold: 0.75        # below this → default to goal_execution
+  fallback_capability: goal_execution
+
+# ---------------------------------------------------------------------------
+# Tools — which syscalls each direct capability may access
+# ---------------------------------------------------------------------------
+# The RootAgent builds a restricted toolset from this list.
+# It cannot call syscalls outside this list (guardrail pattern).
+
+tools:
+  get_schedule_view:
+    syscall: get_schedule_view
+    description: "Get one day's schedule as a list of time slots"
+    capabilities: [schedule_query]
+
+  get_schedule_range:
+    syscall: get_schedule_range
+    description: "Get schedule for a date range"
+    capabilities: [schedule_query]
+
+  get_next_deadline:
+    syscall: get_next_deadline
+    description: "Get the process with the nearest upcoming deadline"
+    capabilities: [schedule_query]
+
+  get_stats:
+    syscall: get_stats
+    description: "Get process table and schedule statistics"
+    capabilities: [status_check]
+
+  list_processes:
+    syscall: list_processes
+    description: "List all processes, optionally filtered by status or tag"
+    capabilities: [status_check]
+
+  list_overdue_processes:
+    syscall: list_overdue_processes
+    description: "List processes past their deadline"
+    capabilities: [status_check]

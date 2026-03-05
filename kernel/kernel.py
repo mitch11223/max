@@ -448,6 +448,19 @@ class ProcessTable:
         return {pid: p for pid, p in self._processes.items()
                 if p.get_aging_counter() >= aging_threshold}
 
+    def wake_unblocked_processes(self):
+        """
+        Wake any waiting process whose dependencies are now all terminated.
+        Call this after a process exits to unblock its dependents (join semantics).
+        Returns list of process_ids that were woken.
+        """
+        woken = []
+        for pid, process in self._processes.items():
+            if process.is_waiting() and self.check_dependencies_met(pid):
+                process.wake_up()
+                woken.append(pid)
+        return woken
+
     def save_to_json(self, filepath):
         data = []
         for process in self._processes.values():

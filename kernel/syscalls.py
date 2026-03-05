@@ -321,6 +321,16 @@ def get_next_deadline():
     return _process_to_dict(p)
 
 
+def wake_unblocked_processes():
+    """
+    Wake any waiting process whose child dependencies have all terminated.
+    This is the join() mechanism — call after any process exits.
+    Returns dict with ok and list of woken process_ids.
+    """
+    woken = _process_table.wake_unblocked_processes()
+    return {"ok": True, "woken": woken}
+
+
 def reset_state():
     """Clear all processes and schedule (for testing/examples). Next initialize_schedule or build_schedule will start fresh."""
     global _schedule, _dispatcher
