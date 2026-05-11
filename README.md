@@ -1,6 +1,6 @@
 # max (maximum time efficiency)
 
-A personal scheduling system that automatically optimizes daily task allocation based on deadlines and priorities, with natural language control via OpenClaw.
+A personal scheduling system that automatically optimizes daily task allocation based on deadlines and priorities, with natural language control via OpenClaw(server down rn but theres a cli to invoke).
 
 ## Project Structure
 
